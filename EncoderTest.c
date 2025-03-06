@@ -24,22 +24,88 @@
 
 #include <wiringPi.h> 
 #include <stdio.h>
+#include <stdbool.h> 
 
-#define smallTwo 25 //this is VCC pin
-#define bigOne 0
-#define bigTwo 2
+#define ENCODER_VCC 25 //this is ENCODER_VCC pin
+#define ENCODER_OUTPUTA 0
+#define ENCODER_OUTPUTB 2
+
+//#define DEBOUNCE_TIME 50 // milliseconds 
+
+
+//encoder ISR callback function
+void encoderISR(void); //FOR OUTPUT A
+//determine direction that encoder is turning
+void encoderDirection(void);
+//init function for gpio 
+void init(void); 
+
+
+volatile bool directionFlag; //either A or B interrupt has been triggered 
+
+///////////////////////////////////////////////////////////
+/*                      ENCODER ISR                     */
+/*  Encoder interrupt service routine, sets ccw/cw flag */
+//////////////////////////////////////////////////////////
+void encoderISR(void){	
+	directionFlag = 1; 
+}
+
+///////////////////////////////////////////////////////////
+/*                  ENCODER DIRECTION                   */
+/*  Encoder takes in interrupt edge, finds direction    */
+//////////////////////////////////////////////////////////
+void encoderDirection(void){
+	int outputA, outputB; //	int outputLastA, outputLastB;
+	
+	outputA = digitalRead(ENCODER_OUTPUTA); 
+	outputB = digitalRead(ENCODER_OUTPUTB); 
+	
+	printf("////////////////ONE CLICK//////////////////\n"); 
+
+	//compare A and B and find direction of encoder
+	if(outputA != outputB){
+		printf("COUNTER CLOCKWISE\n"); 
+	}else if (outputA == outputB){
+		printf("CLOCKWISE\n"); 
+	}
+
+//	printf("A = %i, B = %i \n\n", outputA, outputB); 
+}
+///////////////////////////////////////////////
+/*            PIN INITILIZATION              */
+///////////////////////////////////////////////
+void init(void){
+
+	wiringPiSetup();
+
+	//////////////////ENCODER PIN SETUP//////////////////	
+	//pin internal resistor setup. Pulling high because ENCODER_VCC/GND become reverse polarity when ENCODER_OUTPUTA and ENCODER_OUTPUTB are pulled low. 
+
+	pullUpDnControl(ENCODER_OUTPUTA, PUD_UP); 
+	pullUpDnControl(ENCODER_OUTPUTB, PUD_UP); 
+	
+	//pin input/output mode setup for encoder. 	
+	pinMode(ENCODER_OUTPUTA, INPUT); 
+	pinMode(ENCODER_OUTPUTB, INPUT);
+
+	//interrupt setup for outputs A only.Can do B as well but conditions in encoderDirection function will have to change 
+	wiringPiISR(ENCODER_OUTPUTA, INT_EDGE_FALLING, encoderISR); 	
+
+}
+
 
 int main(int argc, char **argv)
 {
-	wiringPiSetup();
-	pinMode(smallTwo, OUTPUT); //small of 2 pins is output because it increments connections between bigOne and bigTWo (tested on multimeter)
-	pinMode(bigOne, INPUT); 
-	pinMode(bigTwo, INPUT); 
-	
+	//initializing pins
+	init(); 
+
 	while (1){
-		
-		
-		
+		if(directionFlag == 1){
+			encoderDirection(); 
+			//reset direction flag
+			directionFlag = 0; 
+		}
 	}
 	return 0;
 }
